@@ -1,0 +1,98 @@
+// Prisma baseline
+// Tables: users, habits, habit_completions, habit_metrics
+// Using NextAuth Prisma Adapter tables for users/sessions/accounts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String?   
+  email         String?   @unique
+  emailVerified DateTime? 
+  image         String?
+
+  HABITS        Habit[]
+  sessions      Session[]
+  accounts      Account[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                 Int     @id @default(autoincrement())
+  userId             Int
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+  oauth_token_secret String?  @db.Text
+  oauth_token        String?  @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           Int      @id @default(autoincrement())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Habit {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  name        String
+  notes       String?
+  scheduleDow Int       @default(0) // bitmask 0..127
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completions HabitCompletion[]
+  metrics     HabitMetrics?
+}
+
+model HabitCompletion {
+  id         Int      @id @default(autoincrement())
+  habitId    Int
+  dateLocal  Date     // YYYY-MM-DD as DATE
+  createdAt  DateTime @default(now())
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, dateLocal], name: "habitId_dateLocal")
+}
+
+model HabitMetrics {
+  habitId          Int     @id
+  currentStreak    Int     @default(0)
+  longestStreak    Int     @default(0)
+  lastCompletedDate Date?
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+}
